@@ -1,3 +1,8 @@
+## Available on Chrome Web Store
+
+[SipTime – Install from the Chrome Web Store](https://chromewebstore.google.com/detail/siptime/npjkkjooolnpkpmleojnembmiaeccnml)
+
+
 # SipTime
 
 SipTime is a lightweight browser extension that helps you stay hydrated with simple, reliable reminders.  
