@@ -98,3 +98,61 @@ export function isInQuietHours(
     currentMinutes < endMinutes
   );
 }
+export function createPauseUntil(
+  nowMs: number,
+  durationMinutes: number
+): number {
+  const safeDuration = Math.max(
+    1,
+    durationMinutes
+  );
+
+  return (
+    nowMs +
+    safeDuration * 60_000
+  );
+}
+
+export function isPauseActive(
+  pauseUntil: number | null,
+  nowMs: number = Date.now()
+): boolean {
+  return (
+    typeof pauseUntil === "number" &&
+    pauseUntil > nowMs
+  );
+}
+
+export function getTomorrowResumeDate(
+  now: Date,
+  resumeTime: string = "08:00"
+): Date {
+  const [parsedHours, parsedMinutes] =
+    resumeTime.split(":").map(Number);
+
+  const hours =
+    Number.isInteger(parsedHours) &&
+    parsedHours >= 0 &&
+    parsedHours <= 23
+      ? parsedHours
+      : 8;
+
+  const minutes =
+    Number.isInteger(parsedMinutes) &&
+    parsedMinutes >= 0 &&
+    parsedMinutes <= 59
+      ? parsedMinutes
+      : 0;
+
+  const result = new Date(now);
+
+  result.setDate(result.getDate() + 1);
+  result.setHours(
+    hours,
+    minutes,
+    0,
+    0
+  );
+
+  return result;
+}

@@ -4,8 +4,11 @@ import {
   it
 } from "vitest";
 import {
+  createPauseUntil,
   getNextFixedDate,
-  isInQuietHours
+  getTomorrowResumeDate,
+  isInQuietHours,
+  isPauseActive
 } from "./scheduling";
 
 function createLocalDate(
@@ -307,5 +310,206 @@ describe("isInQuietHours", () => {
     );
 
     expect(result).toBe(false);
+  });
+});
+
+describe("createPauseUntil", () => {
+  it("creates a pause using the requested duration", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      1,
+      14,
+      0
+    ).getTime();
+
+    const result = createPauseUntil(
+      now,
+      30
+    );
+
+    expect(result).toBe(
+      createLocalDate(
+        2026,
+        8,
+        1,
+        14,
+        30
+      ).getTime()
+    );
+  });
+
+  it("uses a minimum duration of one minute", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      1,
+      14,
+      0
+    ).getTime();
+
+    const result = createPauseUntil(
+      now,
+      0
+    );
+
+    expect(result).toBe(
+      now + 60_000
+    );
+  });
+});
+
+describe("isPauseActive", () => {
+  it("returns true when the pause expires in the future", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      1,
+      14,
+      0
+    ).getTime();
+
+    const pauseUntil = createLocalDate(
+      2026,
+      8,
+      1,
+      15,
+      0
+    ).getTime();
+
+    expect(
+      isPauseActive(
+        pauseUntil,
+        now
+      )
+    ).toBe(true);
+  });
+
+  it("returns false when the pause has expired", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      1,
+      15,
+      0
+    ).getTime();
+
+    const pauseUntil = createLocalDate(
+      2026,
+      8,
+      1,
+      14,
+      30
+    ).getTime();
+
+    expect(
+      isPauseActive(
+        pauseUntil,
+        now
+      )
+    ).toBe(false);
+  });
+
+  it("returns false when no pause exists", () => {
+    expect(
+      isPauseActive(
+        null,
+        Date.now()
+      )
+    ).toBe(false);
+  });
+
+  it("treats the exact expiration time as expired", () => {
+    const expiration = createLocalDate(
+      2026,
+      8,
+      1,
+      15,
+      0
+    ).getTime();
+
+    expect(
+      isPauseActive(
+        expiration,
+        expiration
+      )
+    ).toBe(false);
+  });
+});
+
+describe("getTomorrowResumeDate", () => {
+  it("creates a resume time for the following day", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      1,
+      17,
+      30
+    );
+
+    const result = getTomorrowResumeDate(
+      now,
+      "08:00"
+    );
+
+    expect(result).toEqual(
+      createLocalDate(
+        2026,
+        8,
+        2,
+        8,
+        0
+      )
+    );
+  });
+
+  it("supports a custom tomorrow resume time", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      1,
+      17,
+      30
+    );
+
+    const result = getTomorrowResumeDate(
+      now,
+      "09:45"
+    );
+
+    expect(result).toEqual(
+      createLocalDate(
+        2026,
+        8,
+        2,
+        9,
+        45
+      )
+    );
+  });
+
+  it("falls back to 8 AM for an invalid resume time", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      1,
+      17,
+      30
+    );
+
+    const result = getTomorrowResumeDate(
+      now,
+      "invalid"
+    );
+
+    expect(result).toEqual(
+      createLocalDate(
+        2026,
+        8,
+        2,
+        8,
+        0
+      )
+    );
   });
 });

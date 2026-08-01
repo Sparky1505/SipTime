@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import {
+  createPauseUntil,
+  getTomorrowResumeDate,
+  isPauseActive
+} from "../background/scheduling";
+import {
   getNextFireAt,
+  getPauseUntil,
   getSettings,
-  saveSettings
+  saveSettings,
+  setPauseUntil
 } from "../shared/storage";
 import type { ReminderSettings } from "../shared/types";
 
@@ -124,7 +131,9 @@ function Toggle(props: {
   return (
     <button
       aria-label={
-        props.checked ? "Disable reminders" : "Enable reminders"
+        props.checked
+          ? "Disable reminders"
+          : "Enable reminders"
       }
       aria-pressed={props.checked}
       className="water-switch"
@@ -138,15 +147,20 @@ function Toggle(props: {
   );
 }
 
-function formatClock(epochMs: number | null): string {
+function formatClock(
+  epochMs: number | null
+): string {
   if (!epochMs) {
     return "Not scheduled";
   }
 
-  return new Date(epochMs).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit"
-  });
+  return new Date(epochMs).toLocaleTimeString(
+    [],
+    {
+      hour: "numeric",
+      minute: "2-digit"
+    }
+  );
 }
 
 function getCountdown(
@@ -172,14 +186,34 @@ function getCountdown(
     };
   }
 
-  const minutes = Math.ceil(difference / 60_000);
+  const totalMinutes = Math.ceil(
+    difference / 60_000
+  );
+
+  if (totalMinutes >= 60) {
+    const hours = Math.floor(
+      totalMinutes / 60
+    );
+
+    const minutes =
+      totalMinutes % 60;
+
+    return {
+      value: `${hours}:${String(
+        minutes
+      ).padStart(2, "0")}`,
+      label: "hours"
+    };
+  }
 
   return {
-    value: String(minutes),
-    label: minutes === 1 ? "minute" : "minutes"
+    value: String(totalMinutes),
+    label:
+      totalMinutes === 1
+        ? "minute"
+        : "minutes"
   };
 }
-
 function isInQuietHours(
   settings: ReminderSettings,
   currentDate: Date
@@ -188,81 +222,141 @@ function isInQuietHours(
     return false;
   }
 
-  const [startHour, startMinute] = settings.quietStart
-    .split(":")
-    .map(Number);
+  const [startHour, startMinute] =
+    settings.quietStart
+      .split(":")
+      .map(Number);
 
-  const [endHour, endMinute] = settings.quietEnd
-    .split(":")
-    .map(Number);
+  const [endHour, endMinute] =
+    settings.quietEnd
+      .split(":")
+      .map(Number);
 
   if (
-    [startHour, startMinute, endHour, endMinute].some(
-      Number.isNaN
-    )
+    [
+      startHour,
+      startMinute,
+      endHour,
+      endMinute
+    ].some(Number.isNaN)
   ) {
     return false;
   }
 
-  const start = startHour * 60 + startMinute;
-  const end = endHour * 60 + endMinute;
+  const start =
+    startHour * 60 + startMinute;
+
+  const end =
+    endHour * 60 + endMinute;
+
   const current =
-    currentDate.getHours() * 60 + currentDate.getMinutes();
+    currentDate.getHours() * 60 +
+    currentDate.getMinutes();
 
   if (start <= end) {
-    return current >= start && current < end;
+    return (
+      current >= start &&
+      current < end
+    );
   }
 
-  return current >= start || current < end;
+  return (
+    current >= start ||
+    current < end
+  );
 }
 
-function formatStoredTime(value: string): string {
-  const [hours, minutes] = value.split(":").map(Number);
+function formatStoredTime(
+  value: string
+): string {
+  const [hours, minutes] =
+    value.split(":").map(Number);
 
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+  if (
+    Number.isNaN(hours) ||
+    Number.isNaN(minutes)
+  ) {
     return value;
   }
 
   const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
 
-  return date.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit"
-  });
+  date.setHours(
+    hours,
+    minutes,
+    0,
+    0
+  );
+
+  return date.toLocaleTimeString(
+    [],
+    {
+      hour: "numeric",
+      minute: "2-digit"
+    }
+  );
 }
 
 export default function PopupApp() {
   const [settings, setSettings] =
-    useState<ReminderSettings | null>(null);
+    useState<ReminderSettings | null>(
+      null
+    );
 
-  const [nextFireAt, setNextFireAt] =
-    useState<number | null>(null);
+  const [
+    nextFireAt,
+    setNextFireAt
+  ] = useState<number | null>(null);
 
-  const [now, setNow] = useState(Date.now());
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [
+    pauseUntil,
+    setPauseUntilValue
+  ] = useState<number | null>(null);
+
+  const [now, setNow] =
+    useState(Date.now());
+
+  const [
+    isUpdating,
+    setIsUpdating
+  ] = useState(false);
+
+  const [error, setError] =
+    useState<string | null>(null);
 
   async function load() {
     setError(null);
 
     try {
-      const [storedSettings, storedNextFireAt] =
-        await Promise.all([
-          getSettings(),
-          getNextFireAt()
-        ]);
+      const [
+        storedSettings,
+        storedNextFireAt,
+        storedPauseUntil
+      ] = await Promise.all([
+        getSettings(),
+        getNextFireAt(),
+        getPauseUntil()
+      ]);
 
       setSettings(storedSettings);
-      setNextFireAt(storedNextFireAt);
+      setNextFireAt(
+        storedNextFireAt
+      );
+      setPauseUntilValue(
+        storedPauseUntil
+      );
       setNow(Date.now());
-    } catch (loadError: unknown) {
+    } catch (
+      loadError: unknown
+    ) {
       console.error(
         "Failed to refresh SipTime popup:",
         loadError
       );
 
-      setError("Unable to refresh reminder information.");
+      setError(
+        "Unable to refresh reminder information."
+      );
     }
   }
 
@@ -271,126 +365,346 @@ export default function PopupApp() {
 
     void Promise.all([
       getSettings(),
-      getNextFireAt()
+      getNextFireAt(),
+      getPauseUntil()
     ])
-      .then(([storedSettings, storedNextFireAt]) => {
-        if (!isMounted) {
-          return;
-        }
+      .then(
+        ([
+          storedSettings,
+          storedNextFireAt,
+          storedPauseUntil
+        ]) => {
+          if (!isMounted) {
+            return;
+          }
 
-        setSettings(storedSettings);
-        setNextFireAt(storedNextFireAt);
-      })
-      .catch((loadError: unknown) => {
-        console.error(
-          "Failed to load SipTime popup state:",
-          loadError
-        );
+          setSettings(
+            storedSettings
+          );
 
-        if (isMounted) {
-          setError(
-            "Unable to load reminder information."
+          setNextFireAt(
+            storedNextFireAt
+          );
+
+          setPauseUntilValue(
+            storedPauseUntil
           );
         }
-      });
+      )
+      .catch(
+        (
+          loadError: unknown
+        ) => {
+          console.error(
+            "Failed to load SipTime popup state:",
+            loadError
+          );
+
+          if (isMounted) {
+            setError(
+              "Unable to load reminder information."
+            );
+          }
+        }
+      );
 
     const handler: Parameters<
       typeof chrome.storage.onChanged.addListener
-    >[0] = (changes, area) => {
-      if (area !== "sync") {
-        return;
-      }
-
-      if (changes.waterReminderSettings) {
-        setSettings(
+    >[0] = (
+      changes,
+      area
+    ) => {
+      if (area === "sync") {
+        if (
           changes.waterReminderSettings
-            .newValue as ReminderSettings
-        );
+        ) {
+          const value =
+            changes
+              .waterReminderSettings
+              .newValue;
+
+          if (value) {
+            setSettings(
+              value as ReminderSettings
+            );
+          }
+        }
+
+        if (
+          changes.waterReminderNextFireAt
+        ) {
+          const value =
+            changes
+              .waterReminderNextFireAt
+              .newValue;
+
+          setNextFireAt(
+            typeof value === "number"
+              ? value
+              : null
+          );
+        }
       }
 
-      if (changes.waterReminderNextFireAt) {
+      if (
+        area === "local" &&
+        changes
+          .waterReminderPauseUntil
+      ) {
         const value =
-          changes.waterReminderNextFireAt.newValue;
+          changes
+            .waterReminderPauseUntil
+            .newValue;
 
-        setNextFireAt(
-          typeof value === "number" ? value : null
+        setPauseUntilValue(
+          typeof value === "number"
+            ? value
+            : null
         );
       }
     };
 
-    chrome.storage.onChanged.addListener(handler);
+    chrome.storage.onChanged.addListener(
+      handler
+    );
 
     return () => {
       isMounted = false;
-      chrome.storage.onChanged.removeListener(handler);
+
+      chrome.storage.onChanged.removeListener(
+        handler
+      );
     };
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNow(Date.now());
-    }, 1_000);
+    const timer =
+      window.setInterval(() => {
+        setNow(Date.now());
+      }, 1_000);
 
     return () => {
-      window.clearInterval(timer);
+      window.clearInterval(
+        timer
+      );
     };
   }, []);
 
-  async function toggleEnabled() {
-    if (!settings || isUpdating) {
+  async function updatePause(
+    nextPauseUntil:
+      | number
+      | null
+  ) {
+    if (
+      !settings?.enabled ||
+      isUpdating
+    ) {
       return;
     }
 
-    const previousSettings = settings;
-
-    const updatedSettings: ReminderSettings = {
-      ...settings,
-      enabled: !settings.enabled
-    };
+    const previousPauseUntil =
+      pauseUntil;
 
     setIsUpdating(true);
     setError(null);
-    setSettings(updatedSettings);
+    setPauseUntilValue(
+      nextPauseUntil
+    );
 
     try {
-      await saveSettings(updatedSettings);
-    } catch (saveError: unknown) {
+      await setPauseUntil(
+        nextPauseUntil
+      );
+    } catch (
+      pauseError: unknown
+    ) {
       console.error(
-        "Failed to update reminder status:",
-        saveError
+        "Failed to update temporary pause:",
+        pauseError
       );
 
-      setSettings(previousSettings);
-      setError("Unable to update reminder status.");
+      setPauseUntilValue(
+        previousPauseUntil
+      );
+
+      setError(
+        "Unable to update the temporary pause."
+      );
     } finally {
       setIsUpdating(false);
     }
   }
 
-  const countdown = getCountdown(nextFireAt, now);
+  async function pauseForMinutes(
+    durationMinutes: number
+  ) {
+    const nextPauseUntil =
+      createPauseUntil(
+        Date.now(),
+        durationMinutes
+      );
 
-  const quietNow = settings
-    ? isInQuietHours(settings, new Date(now))
-    : false;
+    await updatePause(
+      nextPauseUntil
+    );
+  }
 
-  const statusText = !settings
-    ? "Loading"
-    : !settings.enabled
-      ? "Paused"
-      : quietNow
-        ? "Quiet hours"
-        : "Active";
+  async function pauseUntilTomorrow() {
+    if (!settings) {
+      return;
+    }
+
+    const resumeTime =
+      settings.quietHoursEnabled
+        ? settings.quietEnd
+        : "08:00";
+
+    const nextPauseUntil =
+      getTomorrowResumeDate(
+        new Date(),
+        resumeTime
+      ).getTime();
+
+    await updatePause(
+      nextPauseUntil
+    );
+  }
+
+  async function resumeReminders() {
+    await updatePause(null);
+  }
+
+  async function toggleEnabled() {
+    if (
+      !settings ||
+      isUpdating
+    ) {
+      return;
+    }
+
+    const previousSettings =
+      settings;
+
+    const updatedSettings:
+      ReminderSettings = {
+        ...settings,
+        enabled:
+          !settings.enabled
+      };
+
+    setIsUpdating(true);
+    setError(null);
+    setSettings(
+      updatedSettings
+    );
+
+    try {
+      await saveSettings(
+        updatedSettings
+      );
+    } catch (
+      saveError: unknown
+    ) {
+      console.error(
+        "Failed to update reminder status:",
+        saveError
+      );
+
+      setSettings(
+        previousSettings
+      );
+
+      setError(
+        "Unable to update reminder status."
+      );
+
+      setIsUpdating(false);
+      return;
+    }
+
+    if (
+      !updatedSettings.enabled &&
+      pauseUntil !== null
+    ) {
+      try {
+        await setPauseUntil(
+          null
+        );
+
+        setPauseUntilValue(
+          null
+        );
+      } catch (
+        pauseError: unknown
+      ) {
+        console.error(
+          "Failed to clear temporary pause:",
+          pauseError
+        );
+
+        setError(
+          "Reminders were turned off, but the temporary pause could not be cleared."
+        );
+      }
+    }
+
+    setIsUpdating(false);
+  }
+
+  const pauseActive =
+    Boolean(
+      settings?.enabled &&
+      isPauseActive(
+        pauseUntil,
+        now
+      )
+    );
+
+  const countdown =
+    getCountdown(
+      pauseActive
+        ? pauseUntil
+        : nextFireAt,
+      now
+    );
+
+  const quietNow =
+    settings
+      ? isInQuietHours(
+          settings,
+          new Date(now)
+        )
+      : false;
+
+  const statusText =
+    !settings
+      ? "Loading"
+      : !settings.enabled
+        ? "Off"
+        : pauseActive
+          ? "Paused"
+          : quietNow
+            ? "Quiet hours"
+            : "Active";
 
   const modeText =
-    settings?.reminderType === "INTERVAL"
+    settings?.reminderType ===
+    "INTERVAL"
       ? `Every ${settings.intervalMinutes} minutes`
-      : `${settings?.fixedTimes.length ?? 0} fixed times`;
+      : `${
+          settings?.fixedTimes
+            .length ?? 0
+        } fixed times`;
 
-  const quietHoursText = settings?.quietHoursEnabled
-    ? `${formatStoredTime(
-        settings.quietStart
-      )} – ${formatStoredTime(settings.quietEnd)}`
-    : "Turned off";
+  const quietHoursText =
+    settings
+      ?.quietHoursEnabled
+      ? `${formatStoredTime(
+          settings.quietStart
+        )} – ${formatStoredTime(
+          settings.quietEnd
+        )}`
+      : "Turned off";
 
   return (
     <main className="siptime-popup water-background relative p-4">
@@ -402,13 +716,19 @@ export default function PopupApp() {
       <div
         aria-hidden="true"
         className="water-bubble left-5 top-40 h-4 w-4"
-        style={{ animationDelay: "1.2s" }}
+        style={{
+          animationDelay:
+            "1.2s"
+        }}
       />
 
       <div
         aria-hidden="true"
         className="water-bubble bottom-24 right-12 h-5 w-5"
-        style={{ animationDelay: "2.4s" }}
+        style={{
+          animationDelay:
+            "2.4s"
+        }}
       />
 
       <div
@@ -424,12 +744,12 @@ export default function PopupApp() {
       <section className="water-glass p-4">
         <header className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-          <div className="brand-logo-tile h-11 w-11 shrink-0">
-            <LogoIcon
-              alt=""
-              className="brand-logo-image"
-            />
-          </div>
+            <div className="brand-logo-tile h-11 w-11 shrink-0">
+              <LogoIcon
+                alt=""
+                className="brand-logo-image"
+              />
+            </div>
 
             <div className="min-w-0">
               <h1 className="water-heading text-[25px]">
@@ -437,14 +757,21 @@ export default function PopupApp() {
               </h1>
 
               <p className="water-muted truncate text-xs">
-                Hydration that fits your day
+                Hydration that
+                fits your day
               </p>
             </div>
           </div>
 
           <Toggle
-            checked={settings?.enabled ?? false}
-            disabled={!settings || isUpdating}
+            checked={
+              settings?.enabled ??
+              false
+            }
+            disabled={
+              !settings ||
+              isUpdating
+            }
             onChange={() => {
               void toggleEnabled();
             }}
@@ -458,7 +785,9 @@ export default function PopupApp() {
                 "water-status-dot " +
                 (!settings
                   ? ""
-                  : settings.enabled && !quietNow
+                  : settings.enabled &&
+                      !pauseActive &&
+                      !quietNow
                     ? "water-status-dot-success"
                     : "water-status-dot-warning")
               }
@@ -479,7 +808,9 @@ export default function PopupApp() {
               <p className="water-muted text-[10px] font-bold uppercase tracking-[0.2em]">
                 {!settings?.enabled
                   ? "Reminders"
-                  : "Next sip in"}
+                  : pauseActive
+                    ? "Resumes in"
+                    : "Next sip in"}
               </p>
 
               <div className="water-text-strong mt-1 text-[42px] font-bold leading-none tracking-tight">
@@ -490,7 +821,7 @@ export default function PopupApp() {
 
               <p className="water-muted mt-1 text-sm font-semibold">
                 {!settings?.enabled
-                  ? "paused"
+                  ? "disabled"
                   : countdown.label}
               </p>
             </div>
@@ -499,17 +830,23 @@ export default function PopupApp() {
 
         <div className="mt-2.5 text-center">
           <p className="water-text-strong text-sm font-bold">
-            {settings?.enabled
-              ? `Next reminder at ${formatClock(
-                  nextFireAt
-                )}`
-              : "Enable reminders when you are ready"}
+            {!settings?.enabled
+              ? "Enable reminders when you are ready"
+              : pauseActive
+                ? `Paused until ${formatClock(
+                    pauseUntil
+                  )}`
+                : `Next reminder at ${formatClock(
+                    nextFireAt
+                  )}`}
           </p>
 
           <p className="water-muted mt-1 text-xs leading-5">
-            {quietNow
-              ? "Notifications are suppressed during quiet hours."
-              : "A few regular sips can make hydration easier."}
+            {pauseActive
+              ? "Your existing schedule will resume automatically."
+              : quietNow
+                ? "Notifications are suppressed during quiet hours."
+                : "A few regular sips can make hydration easier."}
           </p>
         </div>
 
@@ -524,7 +861,9 @@ export default function PopupApp() {
             </div>
 
             <p className="water-text-strong mt-1.5 whitespace-nowrap text-[13px] font-bold">
-              {settings ? modeText : "Loading…"}
+              {settings
+                ? modeText
+                : "Loading…"}
             </p>
           </div>
 
@@ -544,6 +883,110 @@ export default function PopupApp() {
             </p>
           </div>
         </div>
+
+        {settings?.enabled ? (
+          <div className="water-inner-panel mt-2.5 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="water-text-strong text-xs font-bold">
+                  {pauseActive
+                    ? "Change temporary pause"
+                    : "Pause reminders"}
+                </p>
+
+                <p className="water-muted mt-0.5 text-[10px]">
+                  {pauseActive
+                    ? `Currently paused until ${formatClock(
+                        pauseUntil
+                      )}`
+                    : "Keep your schedule and resume automatically."}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={
+                "mt-2 grid gap-1.5 " +
+                (pauseActive
+                  ? "grid-cols-5"
+                  : "grid-cols-4")
+              }
+            >
+              {pauseActive ? (
+                <button
+                  className="water-primary-button h-9 px-1 text-[10px] font-bold"
+                  disabled={
+                    isUpdating
+                  }
+                  onClick={() => {
+                    void resumeReminders();
+                  }}
+                  type="button"
+                >
+                  Resume
+                </button>
+              ) : null}
+
+              <button
+                className="water-secondary-button h-9 px-1 text-[10px] font-bold"
+                disabled={
+                  isUpdating
+                }
+                onClick={() => {
+                  void pauseForMinutes(
+                    30
+                  );
+                }}
+                type="button"
+              >
+                30 min
+              </button>
+
+              <button
+                className="water-secondary-button h-9 px-1 text-[10px] font-bold"
+                disabled={
+                  isUpdating
+                }
+                onClick={() => {
+                  void pauseForMinutes(
+                    60
+                  );
+                }}
+                type="button"
+              >
+                1 hour
+              </button>
+
+              <button
+                className="water-secondary-button h-9 px-1 text-[10px] font-bold"
+                disabled={
+                  isUpdating
+                }
+                onClick={() => {
+                  void pauseForMinutes(
+                    120
+                  );
+                }}
+                type="button"
+              >
+                2 hours
+              </button>
+
+              <button
+                className="water-secondary-button h-9 px-1 text-[10px] font-bold"
+                disabled={
+                  isUpdating
+                }
+                onClick={() => {
+                  void pauseUntilTomorrow();
+                }}
+                type="button"
+              >
+                Tomorrow
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {error ? (
           <div
@@ -569,6 +1012,9 @@ export default function PopupApp() {
           <button
             aria-label="Refresh reminder information"
             className="water-secondary-button grid h-11 w-11 shrink-0 place-items-center"
+            disabled={
+              isUpdating
+            }
             onClick={() => {
               void load();
             }}
@@ -579,7 +1025,8 @@ export default function PopupApp() {
         </div>
 
         <p className="water-faint mt-2 text-center text-[10px]">
-          Your reminder settings remain in your browser.
+          Your reminder settings
+          remain in your browser.
         </p>
       </section>
     </main>
