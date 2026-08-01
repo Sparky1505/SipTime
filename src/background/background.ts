@@ -1,17 +1,22 @@
 import {
   getNextFixedDate,
-  isInQuietHours
+  isInQuietHours,
+  isPauseActive
 } from "./scheduling";
 import {
+  getPauseUntil,
   getSettings,
-  setNextFireAt
+  setNextFireAt,
+  setPauseUntil
 } from "../shared/storage";
 import type { ReminderSettings } from "../shared/types";
 
 const ALARM_MAIN = "WATER_MAIN";
 const ALARM_SNOOZE = "WATER_SNOOZE";
+const ALARM_RESUME = "WATER_RESUME";
 
 const NOTIFICATION_ID = "WATER_NOTIFICATION";
+const PAUSE_STORAGE_KEY = "waterReminderPauseUntil";
 
 chrome.runtime.onInstalled.addListener(async () => {
   await rescheduleAll();
@@ -23,11 +28,22 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.storage.onChanged.addListener(
   async (changes, areaName) => {
-    if (areaName !== "sync") {
+    if (
+      areaName === "sync" &&
+      changes.waterReminderSettings
+    ) {
+      await rescheduleAll();
       return;
     }
 
-    if (changes.waterReminderSettings) {
+    if (
+      areaName === "local" &&
+      changes[PAUSE_STORAGE_KEY]
+    ) {
+      await chrome.notifications.clear(
+        NOTIFICATION_ID
+      );
+
       await rescheduleAll();
     }
   }
@@ -35,6 +51,11 @@ chrome.storage.onChanged.addListener(
 
 chrome.alarms.onAlarm.addListener(
   async (alarm) => {
+    if (alarm.name === ALARM_RESUME) {
+      await setPauseUntil(null);
+      return;
+    }
+
     if (
       alarm.name !== ALARM_MAIN &&
       alarm.name !== ALARM_SNOOZE
@@ -46,6 +67,24 @@ chrome.alarms.onAlarm.addListener(
 
     if (!settings.enabled) {
       return;
+    }
+
+    const pauseUntil = await getPauseUntil();
+
+    if (isPauseActive(pauseUntil)) {
+      await schedulePauseResume(
+        pauseUntil as number
+      );
+
+      return;
+    }
+
+    /*
+     * Clean up stale pause state if the browser was
+     * closed or suspended when the resume alarm fired.
+     */
+    if (pauseUntil !== null) {
+      await setPauseUntil(null);
     }
 
     if (settings.reminderType === "INTERVAL") {
@@ -136,6 +175,27 @@ async function rescheduleAll(): Promise<void> {
     return;
   }
 
+  const pauseUntil = await getPauseUntil();
+
+  if (isPauseActive(pauseUntil)) {
+    await schedulePauseResume(
+      pauseUntil as number
+    );
+
+    return;
+  }
+
+  /*
+   * An expired pause can remain in storage when the
+   * browser was closed when it should have resumed.
+   * Removing it triggers one clean rescheduling pass
+   * through the storage change listener.
+   */
+  if (pauseUntil !== null) {
+    await setPauseUntil(null);
+    return;
+  }
+
   if (settings.reminderType === "INTERVAL") {
     const periodMinutes = Math.max(
       1,
@@ -158,6 +218,23 @@ async function rescheduleAll(): Promise<void> {
   }
 
   await scheduleNextFixedTime(settings);
+}
+
+async function schedulePauseResume(
+  pauseUntil: number
+): Promise<void> {
+  await chrome.notifications.clear(
+    NOTIFICATION_ID
+  );
+
+  await chrome.alarms.create(
+    ALARM_RESUME,
+    {
+      when: pauseUntil
+    }
+  );
+
+  await setNextFireAt(pauseUntil);
 }
 
 async function scheduleNextFixedTime(
