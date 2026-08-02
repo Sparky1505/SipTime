@@ -4,6 +4,12 @@ import type {
   ReactNode
 } from "react";
 import {
+  formatIntervalDuration,
+  formatIntervalPresetLabel,
+  INTERVAL_PRESETS,
+  isIntervalPreset
+} from "../shared/intervals";
+import {
   DEFAULT_SETTINGS,
   getSettings,
   saveSettings
@@ -53,7 +59,6 @@ function WaterDropIcon(props: { className?: string }) {
     </svg>
   );
 }
-
 
 function ClockIcon() {
   return (
@@ -311,6 +316,7 @@ function SegmentedControl(props: {
   return (
     <div className="water-segmented">
       <button
+        aria-pressed={props.value === "INTERVAL"}
         className="water-segmented-button"
         data-active={props.value === "INTERVAL"}
         onClick={() => props.onChange("INTERVAL")}
@@ -320,6 +326,7 @@ function SegmentedControl(props: {
       </button>
 
       <button
+        aria-pressed={props.value === "FIXED_TIMES"}
         className="water-segmented-button"
         data-active={props.value === "FIXED_TIMES"}
         onClick={() => props.onChange("FIXED_TIMES")}
@@ -490,7 +497,9 @@ function HelpPanel(props: {
 }) {
   const scheduleTip =
     props.settings.reminderType === "INTERVAL"
-      ? `Your current interval is ${props.settings.intervalMinutes} minutes. Many users begin with 30–60 minutes and adjust from there.`
+      ? `Your current interval is ${formatIntervalDuration(
+          props.settings.intervalMinutes
+        )}. Choose a quick preset or enter a custom duration.`
       : `You currently have ${props.settings.fixedTimes.length} fixed reminder times. Add times that match natural breaks in your day.`;
 
   return (
@@ -514,7 +523,7 @@ function HelpPanel(props: {
       <div className="mt-5 space-y-3">
         <article className="help-tip">
           <p className="help-tip-label">
-            Recommended schedule
+            Reminder schedule
           </p>
 
           <p>{scheduleTip}</p>
@@ -615,6 +624,11 @@ export default function OptionsApp() {
       isMounted = false;
     };
   }, []);
+
+  const intervalUsesPreset = useMemo(
+    () => isIntervalPreset(settings.intervalMinutes),
+    [settings.intervalMinutes]
+  );
 
   const intervalValid = useMemo(
     () =>
@@ -911,7 +925,9 @@ export default function OptionsApp() {
 
               <p className="water-text-strong mt-2 text-lg font-bold">
                 {settings.reminderType === "INTERVAL"
-                  ? `Every ${settings.intervalMinutes} min`
+                  ? `Every ${formatIntervalDuration(
+                      settings.intervalMinutes
+                    )}`
                   : `${settings.fixedTimes.length} fixed times`}
               </p>
             </div>
@@ -1048,8 +1064,11 @@ export default function OptionsApp() {
                   </h3>
 
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {[20, 30, 45, 60].map((minutes) => (
+                    {INTERVAL_PRESETS.map((minutes) => (
                       <button
+                        aria-pressed={
+                          settings.intervalMinutes === minutes
+                        }
                         className="water-chip"
                         data-active={
                           settings.intervalMinutes === minutes
@@ -1063,49 +1082,73 @@ export default function OptionsApp() {
                         }
                         type="button"
                       >
-                        {minutes} min
+                        {formatIntervalPresetLabel(minutes)}
                       </button>
                     ))}
                   </div>
 
-                  <div className="water-inner-panel mt-4 flex flex-wrap items-center gap-3 p-4">
-                    <label
-                      className="water-text text-sm font-semibold"
-                      htmlFor="custom-interval"
+                  <div className="water-inner-panel mt-4 p-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label
+                        className="water-text text-sm font-semibold"
+                        htmlFor="custom-interval"
+                      >
+                        Custom interval
+                      </label>
+
+                      <NumberInput
+                        aria-describedby="custom-interval-help"
+                        aria-invalid={!intervalValid}
+                        id="custom-interval"
+                        max={480}
+                        min={1}
+                        onChange={(event) =>
+                          setSettings({
+                            ...settings,
+                            intervalMinutes: Number(
+                              event.target.value
+                            )
+                          })
+                        }
+                        type="number"
+                        value={settings.intervalMinutes}
+                      />
+
+                      <span className="water-muted text-sm">
+                        minutes
+                      </span>
+
+                      <span
+                        className={
+                          "px-2.5 py-1 text-[10px] font-bold " +
+                          (intervalUsesPreset
+                            ? "water-status-success"
+                            : "water-status-warning")
+                        }
+                      >
+                        {intervalUsesPreset
+                          ? "Preset selected"
+                          : "Custom value"}
+                      </span>
+                    </div>
+
+                    <p
+                      className="water-muted mt-2 text-xs"
+                      id="custom-interval-help"
                     >
-                      Custom interval
-                    </label>
-
-                    <NumberInput
-                      id="custom-interval"
-                      max={480}
-                      min={1}
-                      onChange={(event) =>
-                        setSettings({
-                          ...settings,
-                          intervalMinutes: Number(
-                            event.target.value
-                          )
-                        })
-                      }
-                      type="number"
-                      value={settings.intervalMinutes}
-                    />
-
-                    <span className="water-muted text-sm">
-                      minutes
-                    </span>
+                      Choose a preset above or enter any value
+                      from 1 to 480 minutes.
+                    </p>
                   </div>
 
                   {!intervalValid ? (
                     <p className="mt-2 text-xs font-semibold text-[#f1aaa6]">
-                      Enter a value between 1 and 480
-                      minutes.
+                      Enter a value between 1 and 480 minutes.
                     </p>
                   ) : (
                     <p className="water-muted mt-2 text-xs">
-                      A 30–60 minute interval works well for
-                      most routines.
+                      Preset changes remain unsaved until you
+                      select Save and apply.
                     </p>
                   )}
                 </div>
@@ -1307,27 +1350,26 @@ export default function OptionsApp() {
               </div>
             </Card>
           </div>
+
           <HelpPanel settings={settings} />
         </div>
       </div>
 
       <div
-          className="options-save-bar fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3"
-          data-unsaved={hasUnsavedChanges}
-        >
+        className="options-save-bar fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3"
+        data-unsaved={hasUnsavedChanges}
+      >
         <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="options-save-message text-xs">
-              {hasUnsavedChanges
-                ? "Review your changes, then select Save settings to apply them."
-                : "Your hydration preferences are saved and active."}
-            </p>
+          <p className="options-save-message text-xs">
+            {hasUnsavedChanges
+              ? "Review your changes, then select Save settings to apply them."
+              : "Your hydration preferences are saved and active."}
+          </p>
 
           <div className="flex gap-2">
             <button
               className="water-secondary-button flex-1 px-4 py-2.5 text-sm font-semibold sm:flex-none"
-              disabled={
-                !hasUnsavedChanges || isSaving
-              }
+              disabled={!hasUnsavedChanges || isSaving}
               onClick={discardChanges}
               type="button"
             >
@@ -1336,9 +1378,7 @@ export default function OptionsApp() {
 
             <button
               className="water-primary-button flex flex-1 items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold sm:flex-none"
-              disabled={
-                !hasUnsavedChanges || isSaving
-              }
+              disabled={!hasUnsavedChanges || isSaving}
               onClick={() => {
                 void handleSave();
               }}
@@ -1346,9 +1386,9 @@ export default function OptionsApp() {
             >
               <CheckIcon />
 
-                  {isSaving
-                    ? "Saving changes…"
-                    : "Save and apply"}
+              {isSaving
+                ? "Saving changes…"
+                : "Save and apply"}
             </button>
           </div>
         </div>
