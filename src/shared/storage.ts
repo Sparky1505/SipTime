@@ -1,8 +1,13 @@
 import type { ReminderSettings } from "./types";
 
+import {  resolveOnboardingCompleted} from "./onboarding";
+
+
 const SETTINGS_KEY = "waterReminderSettings";
 const NEXT_FIRE_KEY = "waterReminderNextFireAt";
 const PAUSE_UNTIL_KEY = "waterReminderPauseUntil";
+const ONBOARDING_COMPLETED_KEY = "waterReminderOnboardingCompleted";
+
 
 export const DEFAULT_SETTINGS: ReminderSettings = {
   enabled: true,
@@ -87,4 +92,26 @@ export async function getPauseUntil(): Promise<number | null> {
   return typeof value === "number"
     ? value
     : null;
+}
+
+export async function getOnboardingCompleted():
+  Promise<boolean> {
+  const result =
+    await chrome.storage.local.get(
+      ONBOARDING_COMPLETED_KEY
+    );
+
+  return resolveOnboardingCompleted(
+    result[
+      ONBOARDING_COMPLETED_KEY
+    ]
+  );
+}
+export async function setOnboardingCompleted(
+  completed: boolean
+): Promise<void> {
+  await chrome.storage.local.set({
+    [ONBOARDING_COMPLETED_KEY]:
+      completed
+  });
 }
