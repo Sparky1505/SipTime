@@ -1,9 +1,12 @@
 import {
+  getFixedDateAfterSkip,
+  getIntervalDateAfterSkip,
   getNextFixedDate,
   isInQuietHours,
   isPauseActive
 } from "./scheduling";
 import {
+  getNextFireAt,
   getPauseUntil,
   getSettings,
   setNextFireAt,
@@ -16,6 +19,14 @@ import type { ReminderSettings } from "../shared/types";
 import {
   shouldStartOnboarding
 } from "../shared/onboarding";
+
+import {
+  isSkipNextReminderMessage
+} from "../shared/messages";
+
+import type {
+  SkipNextReminderResponse
+} from "../shared/messages";
 
 
 const ALARM_MAIN = "WATER_MAIN";
@@ -49,6 +60,58 @@ chrome.runtime.onInstalled.addListener(
 chrome.runtime.onStartup.addListener(async () => {
   await rescheduleAll();
 });
+
+chrome.runtime.onMessage.addListener(
+  (
+    message,
+    _sender,
+    sendResponse
+  ) => {
+    if (
+      !isSkipNextReminderMessage(
+        message
+      )
+    ) {
+      return false;
+    }
+
+    void skipNextReminder()
+      .then((nextFireAt) => {
+        const response:
+          SkipNextReminderResponse = {
+            ok: true,
+            nextFireAt
+          };
+
+        sendResponse(response);
+      })
+      .catch(
+        (
+          skipError: unknown
+        ) => {
+          console.error(
+            "Failed to skip next reminder:",
+            skipError
+          );
+
+          const response:
+            SkipNextReminderResponse = {
+              ok: false,
+              nextFireAt: null,
+              error:
+                skipError instanceof Error
+                  ? skipError.message
+                  : "Unable to skip the next reminder."
+            };
+
+          sendResponse(response);
+        }
+      );
+
+
+    return true;
+  }
+);
 
 chrome.storage.onChanged.addListener(
   async (changes, areaName) => {
@@ -183,6 +246,110 @@ chrome.notifications.onButtonClicked.addListener(
     }
   }
 );
+
+async function skipNextReminder():
+  Promise<number> {
+  const settings =
+    await getSettings();
+
+  if (!settings.enabled) {
+    throw new Error(
+      "Enable reminders before skipping."
+    );
+  }
+
+  const pauseUntil =
+    await getPauseUntil();
+
+  if (pauseUntil !== null) {
+    throw new Error(
+      "Resume reminders before skipping."
+    );
+  }
+
+  await chrome.notifications.clear(
+    NOTIFICATION_ID
+  );
+
+  await chrome.alarms.clear(
+    ALARM_MAIN
+  );
+
+  await chrome.alarms.clear(
+    ALARM_SNOOZE
+  );
+
+  const nowMs = Date.now();
+
+  if (
+    settings.reminderType ===
+    "INTERVAL"
+  ) {
+    const currentNextFireAt =
+      await getNextFireAt();
+
+    const nextReminder =
+      getIntervalDateAfterSkip(
+        nowMs,
+        currentNextFireAt,
+        settings.intervalMinutes
+      );
+
+    const periodMinutes =
+      Number.isFinite(
+        settings.intervalMinutes
+      )
+        ? Math.max(
+            1,
+            settings.intervalMinutes
+          )
+        : 1;
+
+    await chrome.alarms.create(
+      ALARM_MAIN,
+      {
+        when: nextReminder,
+        periodInMinutes:
+          periodMinutes
+      }
+    );
+
+    await setNextFireAt(
+      nextReminder
+    );
+
+    return nextReminder;
+  }
+
+  const nextReminder =
+    getFixedDateAfterSkip(
+      new Date(nowMs),
+      settings.fixedTimes
+    );
+
+  if (!nextReminder) {
+    await setNextFireAt(null);
+
+    throw new Error(
+      "No valid fixed reminder time is available."
+    );
+  }
+
+  await chrome.alarms.create(
+    ALARM_MAIN,
+    {
+      when: nextReminder.getTime()
+    }
+  );
+
+  await setNextFireAt(
+    nextReminder.getTime()
+  );
+
+  return nextReminder.getTime();
+}
+
+
 
 async function rescheduleAll(): Promise<void> {
   await chrome.alarms.clearAll();
