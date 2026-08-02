@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState
+} from "react";
 import {
   createPauseUntil,
   getTomorrowResumeDate,
@@ -163,13 +167,14 @@ function Toggle(props: {
 }) {
   return (
     <button
+      aria-checked={props.checked}
       aria-label={
         props.checked
           ? "Disable reminders"
           : "Enable reminders"
       }
-      aria-pressed={props.checked}
       className="water-switch"
+      role="switch"
       data-checked={props.checked}
       disabled={props.disabled}
       onClick={props.onChange}
@@ -367,6 +372,57 @@ const [
   const [error, setError] =
     useState<string | null>(null);
 
+  const errorRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+  const [
+    actionAnnouncement,
+    setActionAnnouncement
+  ] = useState<{
+    id: number;
+    text: string;
+  } | null>(null);
+
+  const announcementSequenceRef =
+    useRef(0);
+
+  const actionAnnouncementTimeoutRef =
+    useRef<number | null>(null);
+
+  const skipConfirmationTimeoutRef =
+    useRef<number | null>(null);
+
+  function announceAction(
+    message: string
+  ) {
+    if (
+      actionAnnouncementTimeoutRef.current !==
+      null
+    ) {
+      window.clearTimeout(
+        actionAnnouncementTimeoutRef.current
+      );
+    }
+
+    announcementSequenceRef.current += 1;
+
+    setActionAnnouncement({
+      id:
+        announcementSequenceRef.current,
+      text: message
+    });
+
+    actionAnnouncementTimeoutRef.current =
+      window.setTimeout(() => {
+        setActionAnnouncement(null);
+
+        actionAnnouncementTimeoutRef.current =
+          null;
+      }, 2500);
+  }
+
   async function load() {
     setError(null);
 
@@ -389,6 +445,10 @@ const [
         storedPauseUntil
       );
       setNow(Date.now());
+
+      announceAction(
+        "Reminder information refreshed."
+      );
     } catch (
       loadError: unknown
     ) {
@@ -533,6 +593,34 @@ const [
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (
+        actionAnnouncementTimeoutRef.current !==
+        null
+      ) {
+        window.clearTimeout(
+          actionAnnouncementTimeoutRef.current
+        );
+      }
+
+      if (
+        skipConfirmationTimeoutRef.current !==
+        null
+      ) {
+        window.clearTimeout(
+          skipConfirmationTimeoutRef.current
+        );
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.focus();
+    }
+  }, [error]);
+
   async function updatePause(
     nextPauseUntil:
       | number
@@ -557,6 +645,14 @@ const [
     try {
       await setPauseUntil(
         nextPauseUntil
+      );
+
+      announceAction(
+        nextPauseUntil === null
+          ? "Reminders resumed."
+          : `Reminders paused until ${formatClock(
+              nextPauseUntil
+            )}.`
       );
     } catch (
       pauseError: unknown
@@ -636,6 +732,18 @@ const [
   setSkipConfirmed(false);
   setError(null);
 
+  if (
+    skipConfirmationTimeoutRef.current !==
+    null
+  ) {
+    window.clearTimeout(
+      skipConfirmationTimeoutRef.current
+    );
+
+    skipConfirmationTimeoutRef.current =
+      null;
+  }
+
   try {
     const response =
       (await chrome.runtime.sendMessage({
@@ -657,9 +765,19 @@ const [
     setNow(Date.now());
     setSkipConfirmed(true);
 
-    window.setTimeout(() => {
-      setSkipConfirmed(false);
-    }, 1800);
+    announceAction(
+      `Next reminder skipped. Next reminder at ${formatClock(
+        response.nextFireAt
+      )}.`
+    );
+
+    skipConfirmationTimeoutRef.current =
+      window.setTimeout(() => {
+        setSkipConfirmed(false);
+
+        skipConfirmationTimeoutRef.current =
+          null;
+      }, 1800);
   } catch (
     skipError: unknown
   ) {
@@ -754,6 +872,12 @@ const [
       }
     }
 
+    announceAction(
+      updatedSettings.enabled
+        ? "Reminders enabled."
+        : "Reminders disabled."
+    );
+
     setIsUpdating(false);
   }
 
@@ -813,7 +937,23 @@ const [
       : "Turned off";
 
   return (
-    <main className="siptime-popup water-background relative p-4">
+    <main
+      aria-labelledby="siptime-popup-title"
+      className="siptime-popup water-background relative p-4"
+    >
+      <p
+        aria-atomic="true"
+        aria-live="polite"
+        className="visually-hidden"
+        key={
+          actionAnnouncement?.id ??
+          "empty-announcement"
+        }
+        role="status"
+      >
+        {actionAnnouncement?.text ?? ""}
+      </p>
+
       <div
         aria-hidden="true"
         className="water-bubble right-7 top-20 h-7 w-7"
@@ -847,7 +987,13 @@ const [
         className="water-wave water-wave-two"
       />
 
-      <section className="water-glass p-4">
+      <section
+        aria-busy={
+          !settings ||
+          isUpdating
+        }
+        className="water-glass p-4"
+      >
         <header className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="brand-logo-tile h-11 w-11 shrink-0">
@@ -858,7 +1004,10 @@ const [
             </div>
 
             <div className="min-w-0">
-              <h1 className="water-heading text-[25px]">
+              <h1
+                className="water-heading text-[25px]"
+                id="siptime-popup-title"
+              >
                 SipTime
               </h1>
 
@@ -885,8 +1034,14 @@ const [
         </header>
 
         <div className="mt-2.5 flex justify-center">
-          <div className="water-status px-3 py-1.5 text-xs font-semibold">
+          <div
+            aria-atomic="true"
+            aria-live="polite"
+            className="water-status px-3 py-1.5 text-xs font-semibold"
+            role="status"
+          >
             <span
+              aria-hidden="true"
               className={
                 "water-status-dot " +
                 (!settings
@@ -904,7 +1059,17 @@ const [
         </div>
 
         <div className="mt-2.5 flex justify-center">
-          <div className="water-timer">
+          <div
+            aria-label={
+              !settings?.enabled
+                ? "Hydration reminders are off."
+                : pauseActive
+                  ? `Reminders resume in ${countdown.value} ${countdown.label}.`
+                  : `Next reminder in ${countdown.value} ${countdown.label}.`
+            }
+            className="water-timer"
+            role="timer"
+          >
             <div
               aria-hidden="true"
               className="water-timer-liquid"
@@ -1120,7 +1285,9 @@ const [
         {error ? (
           <div
             className="water-error-message mt-2 px-3 py-2 text-xs font-medium"
+            ref={errorRef}
             role="alert"
+            tabIndex={-1}
           >
             {error}
           </div>

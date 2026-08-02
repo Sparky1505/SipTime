@@ -1519,3 +1519,258 @@ body:has(.siptime-popup) {
   opacity: 0.5;
   transform: none;
 }
+/* Accessibility interaction polish */
+
+.visually-hidden {
+  position: absolute !important;
+
+  width: 1px !important;
+  height: 1px !important;
+
+  padding: 0 !important;
+  margin: -1px !important;
+
+  overflow: hidden !important;
+
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+
+  border: 0 !important;
+
+  white-space: nowrap !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+summary:focus-visible,
+[role="listbox"]:focus-visible {
+  outline-color: #b8eff8;
+  outline-width: 3px;
+  outline-offset: 3px;
+}
+
+.water-switch {
+  width: 48px;
+  min-width: 48px;
+  height: 44px;
+  min-height: 44px;
+
+  border: 0;
+
+  background: transparent;
+}
+
+.water-switch::before {
+  position: absolute;
+  top: 8px;
+  left: 0;
+
+  width: 48px;
+  height: 28px;
+
+  border: 1px solid var(--water-line-soft);
+  border-radius: 999px;
+
+  background: #102b37;
+
+  content: "";
+
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.water-switch[data-checked="true"] {
+  border-color: transparent;
+  background: transparent;
+}
+
+.water-switch[data-checked="true"]::before {
+  border-color: #68b7c9;
+
+  background:
+    linear-gradient(
+      90deg,
+      #397f95,
+      #55a8bc
+    );
+}
+
+.water-switch-knob {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  left: 0;
+}
+
+.water-switch:disabled {
+  opacity: 0.45;
+}
+
+.siptime-popup button:not(.water-switch),
+.water-chip,
+.water-navigation-link,
+.water-segmented-button,
+.time-picker-footer button {
+  min-height: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .water-primary-button:hover:not(:disabled),
+  .water-secondary-button:hover:not(:disabled),
+  .water-navigation-link:hover,
+  .water-chip:hover,
+  .time-picker-trigger:hover:not(:disabled),
+  .time-wheel-option[data-selected="true"] {
+    transform: none !important;
+  }
+
+  .water-switch::before,
+  .water-switch-knob {
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  button,
+  a,
+  input,
+  summary,
+  [role="listbox"] {
+    border-color: ButtonText;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  summary:focus-visible,
+  [role="listbox"]:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 3px;
+  }
+
+  .water-primary-button,
+  .water-secondary-button,
+  .water-chip,
+  .water-segmented-button,
+  .time-picker-trigger {
+    background: ButtonFace;
+    color: ButtonText;
+  }
+
+  [aria-pressed="true"],
+  [role="switch"][aria-checked="true"]::before,
+  .time-wheel-option[aria-selected="true"] {
+    forced-color-adjust: none;
+
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .water-switch::before {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+  }
+
+  .water-switch-knob {
+    forced-color-adjust: none;
+    background: ButtonText;
+  }
+
+  [role="switch"][aria-checked="true"]
+    .water-switch-knob {
+    background: HighlightText;
+  }
+
+  .water-status-dot {
+    border: 1px solid CanvasText;
+    background: CanvasText;
+  }
+
+  .water-error-message {
+    border: 2px solid LinkText;
+  }
+
+  .time-wheel-selection {
+    border: 2px solid Highlight;
+    background: transparent;
+  }
+}
+/* Accessibility completion */
+
+.water-error-message:focus {
+  outline:
+    3px solid
+    var(--water-error);
+
+  outline-offset:
+    3px;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --water-line:
+      rgb(184 239 248 / 72%);
+
+    --water-line-soft:
+      rgb(184 239 248 / 52%);
+
+    --water-text-muted:
+      #d6e7eb;
+
+    --water-text-faint:
+      #c3d9df;
+  }
+
+  .water-primary-button,
+  .water-secondary-button,
+  .water-chip,
+  .water-segmented-button,
+  .time-picker-trigger,
+  .water-input,
+  .water-inner-panel,
+  .water-glass {
+    border-width:
+      2px;
+  }
+
+  .water-status-dot {
+    outline:
+      1px solid
+      currentColor;
+
+    outline-offset:
+      1px;
+  }
+}
+
+@media (pointer: coarse) {
+  .water-chip,
+  .water-navigation-link,
+  .water-segmented-button,
+  .time-picker-trigger,
+  .time-picker-footer button,
+  .siptime-popup button:not(.water-switch) {
+    min-height:
+      48px;
+  }
+
+  .water-switch {
+    min-height:
+      48px;
+    height:
+      48px;
+  }
+
+  .water-switch::before {
+    top:
+      10px;
+  }
+
+  .water-switch-knob {
+    top:
+      14px;
+  }
+}

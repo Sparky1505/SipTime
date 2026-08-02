@@ -1,4 +1,4 @@
-﻿import {
+import {
   useEffect,
   useId,
   useRef
@@ -249,6 +249,7 @@ export function TimeWheelColumn<
             `${optionIdPrefix}-option-${selectedIndex}`
           }
           aria-labelledby={labelId}
+          aria-orientation="vertical"
           className="time-wheel-scroll"
           data-time-wheel={
             props.name
@@ -274,8 +275,14 @@ export function TimeWheelColumn<
 
               return (
                 <div
+                  aria-posinset={
+                    index + 1
+                  }
                   aria-selected={
                     selected
+                  }
+                  aria-setsize={
+                    props.options.length
                   }
                   className="time-wheel-option"
                   data-selected={
