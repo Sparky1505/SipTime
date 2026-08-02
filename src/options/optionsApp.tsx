@@ -4,6 +4,12 @@ import type {
   ReactNode
 } from "react";
 import {
+  TimePickerTrigger
+} from "../components/time-picker/TimePickerTrigger";
+import {
+  TimeWheelPicker
+} from "../components/time-picker/TimeWheelPicker";
+import {
   formatIntervalDuration,
   formatIntervalPresetLabel,
   INTERVAL_PRESETS,
@@ -14,6 +20,10 @@ import {
   getSettings,
   saveSettings
 } from "../shared/storage";
+import {
+  formatStoredTime12Hour,
+  isValidStoredTime
+} from "../shared/time";
 import type {
   ReminderSettings,
   ReminderType
@@ -23,6 +33,10 @@ type ToastState = {
   text: string;
   tone: "success" | "info";
 } | null;
+
+type QuietTimeTarget =
+  | "start"
+  | "end";
 
 function LogoIcon(props: {
   className?: string;
@@ -287,16 +301,6 @@ function Switch(props: {
   );
 }
 
-function TextInput(
-  props: InputHTMLAttributes<HTMLInputElement>
-) {
-  return (
-    <input
-      {...props}
-      className="water-input h-11 px-3.5 text-sm font-medium"
-    />
-  );
-}
 
 function NumberInput(
   props: InputHTMLAttributes<HTMLInputElement>
@@ -382,23 +386,77 @@ function FixedTimesEditor(props: {
   fixedTimes: string[];
   onChange: (times: string[]) => void;
 }) {
+  const [
+    pickerState,
+    setPickerState
+  ] = useState<{
+    index: number;
+    removeOnCancel: boolean;
+  } | null>(null);
+
+  const activeTime =
+    pickerState === null
+      ? null
+      : props.fixedTimes[
+          pickerState.index
+        ] ?? null;
+
   function addTime() {
-    props.onChange([...props.fixedTimes, "10:00"]);
+    const index =
+      props.fixedTimes.length;
+
+    props.onChange([
+      ...props.fixedTimes,
+      "10:00"
+    ]);
+
+    setPickerState({
+      index,
+      removeOnCancel: true
+    });
   }
 
-  function updateTime(index: number, value: string) {
-    const updatedTimes = [...props.fixedTimes];
-    updatedTimes[index] = value;
+  function updateTime(
+    index: number,
+    value: string
+  ) {
+    const updatedTimes = [
+      ...props.fixedTimes
+    ];
 
-    props.onChange(updatedTimes);
+    updatedTimes[index] =
+      value;
+
+    props.onChange(
+      updatedTimes
+    );
   }
 
-  function removeTime(index: number) {
+  function removeTime(
+    index: number
+  ) {
     props.onChange(
       props.fixedTimes.filter(
-        (_, currentIndex) => currentIndex !== index
+        (
+          _,
+          currentIndex
+        ) =>
+          currentIndex !==
+          index
       )
     );
+  }
+
+  function cancelPicker() {
+    if (
+      pickerState?.removeOnCancel
+    ) {
+      removeTime(
+        pickerState.index
+      );
+    }
+
+    setPickerState(null);
   }
 
   return (
@@ -430,31 +488,85 @@ function FixedTimesEditor(props: {
           </div>
         ) : null}
 
-        {props.fixedTimes.map((time, index) => (
-          <div
-            className="flex items-center gap-2"
-            key={`${index}-${time}`}
-          >
-            <TextInput
-              aria-label={`Reminder time ${index + 1}`}
-              onChange={(event) =>
-                updateTime(index, event.target.value)
+        {props.fixedTimes.map(
+          (
+            time,
+            index
+          ) => (
+            <div
+              className="flex items-center gap-2"
+              key={
+                `reminder-time-${index}`
               }
-              type="time"
-              value={time}
-            />
-
-            <button
-              aria-label={`Remove reminder time ${index + 1}`}
-              className="water-secondary-button h-11 px-3.5 text-sm font-semibold hover:border-[#a35d5a] hover:bg-[#3a2024] hover:text-[#f1aaa6]"
-              onClick={() => removeTime(index)}
-              type="button"
             >
-              Remove
-            </button>
-          </div>
-        ))}
+              <TimePickerTrigger
+                label={
+                  `Reminder time ${index + 1}`
+                }
+                onClick={() => {
+                  setPickerState({
+                    index,
+                    removeOnCancel: false
+                  });
+                }}
+                value={time}
+              />
+
+              <button
+                aria-label={
+                  `Remove reminder time ${index + 1}`
+                }
+                className="water-secondary-button h-11 px-3.5 text-sm font-semibold hover:border-[#a35d5a] hover:bg-[#3a2024] hover:text-[#f1aaa6]"
+                onClick={() => {
+                  setPickerState(
+                    null
+                  );
+
+                  removeTime(
+                    index
+                  );
+                }}
+                type="button"
+              >
+                Remove
+              </button>
+            </div>
+          )
+        )}
       </div>
+
+      <TimeWheelPicker
+        isOpen={
+          activeTime !== null
+        }
+        onCancel={
+          cancelPicker
+        }
+        onConfirm={(
+          value
+        ) => {
+          if (
+            pickerState !==
+            null
+          ) {
+            updateTime(
+              pickerState.index,
+              value
+            );
+          }
+
+          setPickerState(null);
+        }}
+        title={
+          pickerState === null
+            ? "Select reminder time"
+            : `Reminder time ${pickerState.index + 1}`
+        }
+        value={
+          activeTime ??
+          "10:00"
+        }
+      />
     </div>
   );
 }
@@ -475,22 +587,6 @@ function settingsAreEqual(
   return JSON.stringify(first) === JSON.stringify(second);
 }
 
-function isValidTime(value: string): boolean {
-  if (!/^\d{2}:\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [hours, minutes] = value.split(":").map(Number);
-
-  return (
-    Number.isInteger(hours) &&
-    Number.isInteger(minutes) &&
-    hours >= 0 &&
-    hours <= 23 &&
-    minutes >= 0 &&
-    minutes <= 59
-  );
-}
 
 function HelpPanel(props: {
   settings: ReminderSettings;
@@ -536,7 +632,7 @@ function HelpPanel(props: {
 
           <p>
             Set quiet hours across your usual sleeping period.
-            Overnight ranges such as 23:30–08:00 are supported.
+            Overnight ranges such as 11:30 PM–08:00 AM are supported.
           </p>
         </article>
 
@@ -591,6 +687,13 @@ export default function OptionsApp() {
   const [isTesting, setIsTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
+
+  const [
+    quietTimeTarget,
+    setQuietTimeTarget
+  ] = useState<QuietTimeTarget | null>(
+    null
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -653,15 +756,15 @@ export default function OptionsApp() {
 
     return (
       settings.fixedTimes.length > 0 &&
-      settings.fixedTimes.every(isValidTime)
+      settings.fixedTimes.every(isValidStoredTime)
     );
   }, [settings.fixedTimes, settings.reminderType]);
 
   const quietHoursValid = useMemo(
     () =>
       !settings.quietHoursEnabled ||
-      (isValidTime(settings.quietStart) &&
-        isValidTime(settings.quietEnd)),
+      (isValidStoredTime(settings.quietStart) &&
+        isValidStoredTime(settings.quietEnd)),
     [
       settings.quietEnd,
       settings.quietHoursEnabled,
@@ -831,6 +934,65 @@ export default function OptionsApp() {
     <main className="water-background relative min-h-screen px-4 py-6 sm:px-6 lg:px-8">
       <Toast state={toast} />
 
+      <TimeWheelPicker
+        isOpen={
+          quietTimeTarget !==
+          null
+        }
+        onCancel={() => {
+          setQuietTimeTarget(
+            null
+          );
+        }}
+        onConfirm={(
+          value
+        ) => {
+          if (
+            quietTimeTarget ===
+            "start"
+          ) {
+            setSettings(
+              (
+                current
+              ) => ({
+                ...current,
+                quietStart:
+                  value
+              })
+            );
+          } else if (
+            quietTimeTarget ===
+            "end"
+          ) {
+            setSettings(
+              (
+                current
+              ) => ({
+                ...current,
+                quietEnd:
+                  value
+              })
+            );
+          }
+
+          setQuietTimeTarget(
+            null
+          );
+        }}
+        title={
+          quietTimeTarget ===
+          "end"
+            ? "Set quiet hours end"
+            : "Set quiet hours start"
+        }
+        value={
+          quietTimeTarget ===
+          "end"
+            ? settings.quietEnd
+            : settings.quietStart
+        }
+      />
+
       <div
         aria-hidden="true"
         className="water-bubble right-[8%] top-20 h-14 w-14"
@@ -939,7 +1101,11 @@ export default function OptionsApp() {
 
               <p className="water-text-strong mt-2 text-lg font-bold">
                 {settings.quietHoursEnabled
-                  ? `${settings.quietStart} – ${settings.quietEnd}`
+                  ? `${formatStoredTime12Hour(
+                      settings.quietStart
+                    )} – ${formatStoredTime12Hour(
+                      settings.quietEnd
+                    )}`
                   : "Off"}
               </p>
             </div>
@@ -1186,7 +1352,7 @@ export default function OptionsApp() {
                   </h3>
 
                   <p className="water-muted mt-1 text-xs leading-5">
-                    Overnight ranges such as 23:30 to 08:00
+                    Overnight ranges such as 11:30 PM to 08:00 AM
                     are supported.
                   </p>
                 </div>
@@ -1224,19 +1390,20 @@ export default function OptionsApp() {
                   </label>
 
                   <div className="mt-2">
-                    <TextInput
+                    <TimePickerTrigger
                       disabled={
                         !settings.quietHoursEnabled
                       }
                       id="quiet-start"
-                      onChange={(event) =>
-                        setSettings({
-                          ...settings,
-                          quietStart: event.target.value
-                        })
+                      label="Quiet hours start"
+                      onClick={() => {
+                        setQuietTimeTarget(
+                          "start"
+                        );
+                      }}
+                      value={
+                        settings.quietStart
                       }
-                      type="time"
-                      value={settings.quietStart}
                     />
                   </div>
                 </div>
@@ -1250,19 +1417,20 @@ export default function OptionsApp() {
                   </label>
 
                   <div className="mt-2">
-                    <TextInput
+                    <TimePickerTrigger
                       disabled={
                         !settings.quietHoursEnabled
                       }
                       id="quiet-end"
-                      onChange={(event) =>
-                        setSettings({
-                          ...settings,
-                          quietEnd: event.target.value
-                        })
+                      label="Quiet hours end"
+                      onClick={() => {
+                        setQuietTimeTarget(
+                          "end"
+                        );
+                      }}
+                      value={
+                        settings.quietEnd
                       }
-                      type="time"
-                      value={settings.quietEnd}
                     />
                   </div>
                 </div>
