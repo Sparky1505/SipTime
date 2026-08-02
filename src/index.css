@@ -1045,3 +1045,477 @@ body:has(.siptime-popup) {
     animation-iteration-count: 1 !important;
   }
 }
+/* Apple-style time wheel picker */
+
+.time-picker-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+
+  display: grid;
+  place-items: center;
+
+  padding: 20px;
+
+  background:
+    rgb(1 8 12 / 76%);
+
+  backdrop-filter:
+    blur(8px);
+
+  animation:
+    time-picker-fade-in
+    160ms ease-out;
+}
+
+.time-picker-dialog {
+  width: min(100%, 430px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+
+  padding: 22px;
+
+  border:
+    1.4px solid
+    rgb(123 196 213 / 34%);
+
+  border-radius:
+    var(--water-radius-large);
+
+  background:
+    linear-gradient(
+      150deg,
+      #123646,
+      #081e29 72%
+    );
+
+  color:
+    var(--water-text);
+
+  box-shadow:
+    0 30px 80px
+      rgb(0 0 0 / 52%),
+    0 0 0 1px
+      rgb(145 212 226 / 5%);
+
+  animation:
+    time-picker-rise
+    180ms ease-out;
+}
+
+.time-picker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.time-picker-eyebrow {
+  margin: 0 0 5px;
+
+  color:
+    var(--water-primary-soft);
+
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.time-picker-preview {
+  margin-top: 18px;
+  padding: 13px 16px;
+
+  border:
+    1px solid
+    var(--water-line-soft);
+
+  border-radius:
+    var(--water-radius-medium);
+
+  background:
+    #081d28;
+
+  color:
+    var(--water-text-strong);
+
+  font-size: 22px;
+  font-variant-numeric:
+    tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+
+  box-shadow:
+    inset 0 1px 0
+      rgb(255 255 255 / 3%);
+}
+
+.time-picker-wheels {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1fr)
+    minmax(74px, 0.8fr);
+  gap: 9px;
+
+  margin-top: 16px;
+}
+
+.time-wheel-column {
+  min-width: 0;
+}
+
+.time-wheel-label {
+  margin: 0 0 7px;
+
+  color:
+    var(--water-text-faint);
+
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.time-wheel-shell {
+  position: relative;
+
+  overflow: hidden;
+
+  border:
+    1px solid
+    var(--water-line-soft);
+
+  border-radius:
+    var(--water-radius-medium);
+
+  background:
+    linear-gradient(
+      180deg,
+      #071923,
+      #0b2734 50%,
+      #071923
+    );
+
+  box-shadow:
+    inset 0 10px 25px
+      rgb(0 0 0 / 24%);
+}
+
+.time-wheel-shell::before,
+.time-wheel-shell::after {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  left: 0;
+
+  height: 88px;
+
+  content: "";
+  pointer-events: none;
+}
+
+.time-wheel-shell::before {
+  top: 0;
+
+  background:
+    linear-gradient(
+      180deg,
+      #071923 8%,
+      rgb(7 25 35 / 88%) 42%,
+      transparent
+    );
+}
+
+.time-wheel-shell::after {
+  bottom: 0;
+
+  background:
+    linear-gradient(
+      0deg,
+      #071923 8%,
+      rgb(7 25 35 / 88%) 42%,
+      transparent
+    );
+}
+
+.time-wheel-selection {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 6px;
+  left: 6px;
+
+  height: 44px;
+
+  border-top:
+    1px solid
+    rgb(123 196 213 / 30%);
+  border-bottom:
+    1px solid
+    rgb(123 196 213 / 30%);
+
+  border-radius:
+    var(--water-radius-small);
+
+  background:
+    linear-gradient(
+      90deg,
+      rgb(61 137 158 / 18%),
+      rgb(95 180 203 / 26%),
+      rgb(61 137 158 / 18%)
+    );
+
+  transform:
+    translateY(-50%);
+
+  pointer-events: none;
+}
+
+.time-wheel-scroll {
+  position: relative;
+  z-index: 1;
+
+  height: 220px;
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  padding: 88px 0;
+
+  scroll-behavior: smooth;
+  scroll-snap-type:
+    y mandatory;
+  overscroll-behavior:
+    contain;
+
+  scrollbar-width: none;
+}
+
+.time-wheel-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.time-wheel-option {
+  display: flex;
+
+  height: 44px;
+
+  align-items: center;
+  justify-content: center;
+
+  color:
+    var(--water-text-faint);
+
+  cursor: pointer;
+
+  font-size: 17px;
+  font-variant-numeric:
+    tabular-nums;
+  font-weight: 650;
+
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+
+  transition:
+    color 120ms ease,
+    opacity 120ms ease,
+    transform 120ms ease;
+
+  user-select: none;
+}
+
+.time-wheel-option:hover {
+  color:
+    var(--water-text);
+}
+
+.time-wheel-option[data-selected="true"] {
+  color:
+    var(--water-text-strong);
+
+  font-weight: 850;
+
+  transform:
+    scale(1.08);
+}
+
+.time-wheel-scroll:focus-visible {
+  outline:
+    3px solid
+    rgb(101 182 204 / 32%);
+  outline-offset: -3px;
+}
+
+.time-picker-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+
+  margin-top: 18px;
+  padding-top: 16px;
+
+  border-top:
+    1px solid
+    var(--water-line-soft);
+}
+
+@keyframes time-picker-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes time-picker-rise {
+  from {
+    opacity: 0;
+    transform:
+      translateY(12px)
+      scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform:
+      translateY(0)
+      scale(1);
+  }
+}
+
+@media (max-width: 480px) {
+  .time-picker-backdrop {
+    padding: 12px;
+  }
+
+  .time-picker-dialog {
+    padding: 18px;
+  }
+
+  .time-picker-wheels {
+    gap: 6px;
+  }
+
+  .time-wheel-option {
+    font-size: 16px;
+  }
+
+  .time-picker-footer {
+    display: grid;
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+}
+
+@media (
+  prefers-reduced-motion:
+  reduce
+) {
+  .time-picker-backdrop,
+  .time-picker-dialog {
+    animation: none;
+  }
+
+  .time-wheel-scroll,
+  .time-wheel-option {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
+/* Time picker trigger */
+
+.time-picker-trigger {
+  display: flex;
+
+  width: 100%;
+  min-height: 44px;
+
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 9px 12px 9px 14px;
+
+  border:
+    1.25px solid
+    var(--water-line-soft);
+
+  border-radius:
+    var(--water-radius-small);
+
+  background:
+    var(--water-surface-input);
+
+  color:
+    var(--water-text-strong);
+
+  cursor: pointer;
+
+  box-shadow:
+    inset 0 1px 0
+      rgb(255 255 255 / 2%);
+
+  text-align: left;
+
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.time-picker-trigger:hover:not(:disabled) {
+  border-color:
+    rgb(123 196 213 / 38%);
+
+  background:
+    #0d2b39;
+
+  box-shadow:
+    inset 0 0 0 2px
+      rgb(79 159 182 / 10%);
+
+  transform:
+    translateY(-1px);
+}
+
+.time-picker-trigger-value {
+  overflow: hidden;
+
+  font-size: 14px;
+  font-variant-numeric:
+    tabular-nums;
+  font-weight: 750;
+  letter-spacing: 0.015em;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-picker-trigger-action {
+  display: inline-flex;
+
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+
+  color:
+    var(--water-primary-soft);
+
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.time-picker-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
