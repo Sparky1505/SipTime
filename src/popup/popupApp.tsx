@@ -13,6 +13,14 @@ import {
 } from "../shared/storage";
 import type { ReminderSettings } from "../shared/types";
 
+import {
+  SKIP_NEXT_REMINDER_MESSAGE
+} from "../shared/messages";
+
+import type {
+  SkipNextReminderResponse
+} from "../shared/messages";
+
 function LogoIcon(props: {
   className?: string;
   alt?: string;
@@ -117,6 +125,31 @@ function RefreshIcon() {
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function SkipIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="m6.5 7 7 5-7 5V7Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+
+      <path
+        d="M17 7v10"
+        stroke="currentColor"
+        strokeLinecap="round"
         strokeWidth="1.8"
       />
     </svg>
@@ -320,6 +353,16 @@ export default function PopupApp() {
     isUpdating,
     setIsUpdating
   ] = useState(false);
+
+  const [
+  isSkipping,
+  setIsSkipping
+] = useState(false);
+
+const [
+  skipConfirmed,
+  setSkipConfirmed
+] = useState(false);
 
   const [error, setError] =
     useState<string | null>(null);
@@ -573,6 +616,69 @@ export default function PopupApp() {
   async function resumeReminders() {
     await updatePause(null);
   }
+
+  async function skipNextReminder() {
+  if (
+    !settings?.enabled ||
+    isUpdating ||
+    isSkipping ||
+    nextFireAt === null ||
+    isPauseActive(
+      pauseUntil,
+      Date.now()
+    )
+  ) {
+    return;
+  }
+
+  setIsUpdating(true);
+  setIsSkipping(true);
+  setSkipConfirmed(false);
+  setError(null);
+
+  try {
+    const response =
+      (await chrome.runtime.sendMessage({
+        type:
+          SKIP_NEXT_REMINDER_MESSAGE
+      })) as SkipNextReminderResponse;
+
+    if (!response?.ok) {
+      throw new Error(
+        response?.error ??
+          "Unable to skip the next reminder."
+      );
+    }
+
+    setNextFireAt(
+      response.nextFireAt
+    );
+
+    setNow(Date.now());
+    setSkipConfirmed(true);
+
+    window.setTimeout(() => {
+      setSkipConfirmed(false);
+    }, 1800);
+  } catch (
+    skipError: unknown
+  ) {
+    console.error(
+      "Failed to skip next reminder:",
+      skipError
+    );
+
+    setError(
+      skipError instanceof Error
+        ? skipError.message
+        : "Unable to skip the next reminder."
+    );
+  } finally {
+    setIsSkipping(false);
+    setIsUpdating(false);
+  }
+}
+
 
   async function toggleEnabled() {
     if (
@@ -883,6 +989,29 @@ export default function PopupApp() {
             </p>
           </div>
         </div>
+
+            {settings?.enabled &&
+            !pauseActive ? (
+              <button
+                className="water-secondary-button mt-2.5 flex h-10 w-full items-center justify-center gap-2 px-4 text-xs font-bold"
+                disabled={
+                  isUpdating ||
+                  nextFireAt === null
+                }
+                onClick={() => {
+                  void skipNextReminder();
+                }}
+                type="button"
+              >
+                <SkipIcon />
+
+                {isSkipping
+                  ? "Skipping…"
+                  : skipConfirmed
+                    ? "Next reminder skipped"
+                    : "Skip next reminder"}
+              </button>
+            ) : null}
 
         {settings?.enabled ? (
           <div className="water-inner-panel mt-2.5 px-3 py-2.5">

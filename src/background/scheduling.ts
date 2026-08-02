@@ -156,3 +156,54 @@ export function getTomorrowResumeDate(
 
   return result;
 }
+
+export function getIntervalDateAfterSkip(
+  nowMs: number,
+  currentNextFireAt: number | null,
+  intervalMinutes: number
+): number {
+  const safeIntervalMinutes =
+    Number.isFinite(intervalMinutes)
+      ? Math.max(
+          1,
+          intervalMinutes
+        )
+      : 1;
+
+  const skippedReminder =
+    typeof currentNextFireAt ===
+      "number" &&
+    currentNextFireAt > nowMs
+      ? currentNextFireAt
+      : nowMs;
+
+  return (
+    skippedReminder +
+    safeIntervalMinutes * 60_000
+  );
+}
+
+export function getFixedDateAfterSkip(
+  now: Date,
+  times: string[]
+): Date | null {
+  const skippedReminder =
+    getNextFixedDate(
+      now,
+      times
+    );
+
+  if (!skippedReminder) {
+    return null;
+  }
+
+  const afterSkippedReminder =
+    new Date(
+      skippedReminder.getTime() + 1
+    );
+
+  return getNextFixedDate(
+    afterSkippedReminder,
+    times
+  );
+}

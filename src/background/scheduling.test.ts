@@ -5,6 +5,8 @@ import {
 } from "vitest";
 import {
   createPauseUntil,
+  getFixedDateAfterSkip,
+  getIntervalDateAfterSkip,
   getNextFixedDate,
   getTomorrowResumeDate,
   isInQuietHours,
@@ -511,5 +513,173 @@ describe("getTomorrowResumeDate", () => {
         0
       )
     );
+  });
+});
+
+
+describe("getIntervalDateAfterSkip", () => {
+  it("advances from the currently scheduled reminder", () => {
+    const now =
+      createLocalDate(
+        2026,
+        8,
+        2,
+        13,
+        0
+      ).getTime();
+
+    const currentNextFireAt =
+      createLocalDate(
+        2026,
+        8,
+        2,
+        13,
+        30
+      ).getTime();
+
+    const result =
+      getIntervalDateAfterSkip(
+        now,
+        currentNextFireAt,
+        45
+      );
+
+    expect(result).toBe(
+      createLocalDate(
+        2026,
+        8,
+        2,
+        14,
+        15
+      ).getTime()
+    );
+  });
+
+  it("uses the current time when no future reminder exists", () => {
+    const now =
+      createLocalDate(
+        2026,
+        8,
+        2,
+        13,
+        0
+      ).getTime();
+
+    const result =
+      getIntervalDateAfterSkip(
+        now,
+        null,
+        30
+      );
+
+    expect(result).toBe(
+      createLocalDate(
+        2026,
+        8,
+        2,
+        13,
+        30
+      ).getTime()
+    );
+  });
+
+  it("uses a minimum interval of one minute", () => {
+    const now =
+      createLocalDate(
+        2026,
+        8,
+        2,
+        13,
+        0
+      ).getTime();
+
+    const result =
+      getIntervalDateAfterSkip(
+        now,
+        null,
+        0
+      );
+
+    expect(result).toBe(
+      now + 60_000
+    );
+  });
+});
+
+describe("getFixedDateAfterSkip", () => {
+  it("selects the second upcoming fixed time", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      2,
+      9,
+      0
+    );
+
+    const result =
+      getFixedDateAfterSkip(
+        now,
+        [
+          "10:00",
+          "12:30",
+          "15:00"
+        ]
+      );
+
+    expect(result).toEqual(
+      createLocalDate(
+        2026,
+        8,
+        2,
+        12,
+        30
+      )
+    );
+  });
+
+  it("moves to the next day after skipping the final daily time", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      2,
+      14,
+      0
+    );
+
+    const result =
+      getFixedDateAfterSkip(
+        now,
+        [
+          "10:00",
+          "15:00"
+        ]
+      );
+
+    expect(result).toEqual(
+      createLocalDate(
+        2026,
+        8,
+        3,
+        10,
+        0
+      )
+    );
+  });
+
+  it("returns null when there are no valid fixed times", () => {
+    const now = createLocalDate(
+      2026,
+      8,
+      2,
+      9,
+      0
+    );
+
+    expect(
+      getFixedDateAfterSkip(
+        now,
+        ["invalid"]
+      )
+    ).toBeNull();
   });
 });
