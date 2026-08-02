@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import type {
   InputHTMLAttributes,
   ReactNode
@@ -256,8 +261,20 @@ function Card(props: {
   description: string;
   children: ReactNode;
 }) {
+  const titleId =
+    `${props.id}-title`;
+
+  const descriptionId =
+    `${props.id}-description`;
+
   return (
     <section
+      aria-describedby={
+        descriptionId
+      }
+      aria-labelledby={
+        titleId
+      }
       className="water-glass scroll-mt-6 p-5 sm:p-6"
       id={props.id}
     >
@@ -267,11 +284,17 @@ function Card(props: {
         </div>
 
         <div>
-          <h2 className="water-heading text-lg">
+          <h2
+            className="water-heading text-lg"
+            id={titleId}
+          >
             {props.title}
           </h2>
 
-          <p className="water-muted mt-1 text-sm leading-6">
+          <p
+            className="water-muted mt-1 text-sm leading-6"
+            id={descriptionId}
+          >
             {props.description}
           </p>
         </div>
@@ -289,9 +312,10 @@ function Switch(props: {
 }) {
   return (
     <button
+      aria-checked={props.checked}
       aria-label={props.label}
-      aria-pressed={props.checked}
       className="water-switch"
+      role="switch"
       data-checked={props.checked}
       onClick={() => props.onChange(!props.checked)}
       type="button"
@@ -318,7 +342,11 @@ function SegmentedControl(props: {
   onChange: (value: ReminderType) => void;
 }) {
   return (
-    <div className="water-segmented">
+    <div
+      aria-label="Reminder schedule type"
+      className="water-segmented"
+      role="group"
+    >
       <button
         aria-pressed={props.value === "INTERVAL"}
         className="water-segmented-button"
@@ -374,6 +402,8 @@ function Toast(props: { state: ToastState }) {
           ? "water-toast-success"
           : "")
       }
+      aria-atomic="true"
+      aria-live="polite"
       role="status"
     >
       <CheckIcon />
@@ -460,10 +490,17 @@ function FixedTimesEditor(props: {
   }
 
   return (
-    <div className="water-inner-panel p-4">
+    <div
+      aria-labelledby="fixed-times-title"
+      className="water-inner-panel p-4"
+      role="group"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="water-text-strong text-sm font-bold">
+          <h3
+            className="water-text-strong text-sm font-bold"
+            id="fixed-times-title"
+          >
             Daily reminder times
           </h3>
 
@@ -599,14 +636,20 @@ function HelpPanel(props: {
       : `You currently have ${props.settings.fixedTimes.length} fixed reminder times. Add times that match natural breaks in your day.`;
 
   return (
-    <aside className="water-glass top-6 p-4 xl:sticky">
+    <aside
+      aria-labelledby="siptime-help-title"
+      className="water-glass top-6 p-4 xl:sticky"
+    >
       <div className="flex items-center gap-3">
         <div className="water-icon-tile h-10 w-10 shrink-0">
           <HelpIcon />
         </div>
 
         <div>
-          <h2 className="water-heading text-base">
+          <h2
+            className="water-heading text-base"
+            id="siptime-help-title"
+          >
             SipTime help
           </h2>
 
@@ -688,6 +731,14 @@ export default function OptionsApp() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
+  const toastTimeoutRef =
+    useRef<number | null>(null);
+
+  const errorRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
   const [
     quietTimeTarget,
     setQuietTimeTarget
@@ -727,6 +778,25 @@ export default function OptionsApp() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (
+        toastTimeoutRef.current !==
+        null
+      ) {
+        window.clearTimeout(
+          toastTimeoutRef.current
+        );
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.focus();
+    }
+  }, [error]);
 
   const intervalUsesPreset = useMemo(
     () => isIntervalPreset(settings.intervalMinutes),
@@ -780,11 +850,24 @@ export default function OptionsApp() {
   function showToast(
     state: Exclude<ToastState, null>
   ) {
+    if (
+      toastTimeoutRef.current !==
+      null
+    ) {
+      window.clearTimeout(
+        toastTimeoutRef.current
+      );
+    }
+
     setToast(state);
 
-    window.setTimeout(() => {
-      setToast(null);
-    }, 1800);
+    toastTimeoutRef.current =
+      window.setTimeout(() => {
+        setToast(null);
+
+        toastTimeoutRef.current =
+          null;
+      }, 1800);
   }
 
   function validateSettings(): string | null {
@@ -913,8 +996,15 @@ export default function OptionsApp() {
 
   if (isLoading) {
     return (
-      <main className="water-background grid min-h-screen place-items-center px-6">
-        <div className="water-glass px-8 py-7 text-center">
+      <main
+        aria-busy="true"
+        aria-labelledby="siptime-loading-status"
+        className="water-background grid min-h-screen place-items-center px-6"
+      >
+        <div
+          className="water-glass px-8 py-7 text-center"
+          role="status"
+        >
           <div className="brand-logo-tile mx-auto h-14 w-14">
             <LogoIcon
               alt=""
@@ -922,7 +1012,11 @@ export default function OptionsApp() {
             />
           </div>
 
-          <p className="water-muted mt-4 text-sm font-semibold">
+          <p
+            aria-live="polite"
+            className="water-muted mt-4 text-sm font-semibold"
+            id="siptime-loading-status"
+          >
             Loading your hydration settings…
           </p>
         </div>
@@ -931,7 +1025,10 @@ export default function OptionsApp() {
   }
 
   return (
-    <main className="water-background relative min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+    <main
+      aria-labelledby="siptime-options-title"
+      className="water-background relative min-h-screen px-4 py-6 sm:px-6 lg:px-8"
+    >
       <Toast state={toast} />
 
       <TimeWheelPicker
@@ -1032,7 +1129,10 @@ export default function OptionsApp() {
               </div>
 
               <div>
-                <h1 className="water-heading text-2xl sm:text-3xl">
+                <h1
+                  className="water-heading text-2xl sm:text-3xl"
+                  id="siptime-options-title"
+                >
                   SipTime
                 </h1>
 
@@ -1115,7 +1215,9 @@ export default function OptionsApp() {
         {error ? (
           <div
             className="water-error-message mt-5 px-5 py-4 text-sm font-medium shadow-sm"
+            ref={errorRef}
             role="alert"
+            tabIndex={-1}
           >
             {error}
           </div>
@@ -1458,6 +1560,8 @@ export default function OptionsApp() {
                 </label>
 
                 <NumberInput
+                  aria-describedby="snooze-duration-help"
+                  aria-invalid={!snoozeValid}
                   id="snooze-duration"
                   max={120}
                   min={1}
@@ -1479,7 +1583,10 @@ export default function OptionsApp() {
               </div>
 
               {!snoozeValid ? (
-                <p className="mt-2 text-xs font-semibold text-[#f1aaa6]">
+                <p
+                  className="mt-2 text-xs font-semibold text-[#f1aaa6]"
+                  id="snooze-duration-help"
+                >
                   Enter a snooze duration between 1 and 120
                   minutes.
                 </p>
@@ -1528,7 +1635,12 @@ export default function OptionsApp() {
         data-unsaved={hasUnsavedChanges}
       >
         <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="options-save-message text-xs">
+          <p
+            aria-atomic="true"
+            aria-live="polite"
+            className="options-save-message text-xs"
+            role="status"
+          >
             {hasUnsavedChanges
               ? "Review your changes, then select Save settings to apply them."
               : "Your hydration preferences are saved and active."}

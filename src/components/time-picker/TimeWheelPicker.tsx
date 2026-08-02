@@ -1,4 +1,4 @@
-﻿import {
+import {
   useEffect,
   useId,
   useRef,
@@ -6,7 +6,7 @@
 } from "react";
 import type {
   KeyboardEvent,
-  MouseEvent
+  PointerEvent
 } from "react";
 import {
   formatStoredTime12Hour,
@@ -128,9 +128,9 @@ function TimeWheelPickerDialog(
       storedDraft
     );
 
-  function handleBackdropMouseDown(
+  function handleBackdropPointerDown(
     event:
-      MouseEvent<HTMLDivElement>
+      PointerEvent<HTMLDivElement>
   ) {
     if (
       event.target ===
@@ -211,8 +211,8 @@ function TimeWheelPickerDialog(
   return (
     <div
       className="time-picker-backdrop"
-      onMouseDown={
-        handleBackdropMouseDown
+      onPointerDown={
+        handleBackdropPointerDown
       }
     >
       <div
