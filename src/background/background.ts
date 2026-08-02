@@ -7,9 +7,16 @@ import {
   getPauseUntil,
   getSettings,
   setNextFireAt,
+  setOnboardingCompleted,
   setPauseUntil
 } from "../shared/storage";
+
 import type { ReminderSettings } from "../shared/types";
+
+import {
+  shouldStartOnboarding
+} from "../shared/onboarding";
+
 
 const ALARM_MAIN = "WATER_MAIN";
 const ALARM_SNOOZE = "WATER_SNOOZE";
@@ -18,9 +25,26 @@ const ALARM_RESUME = "WATER_RESUME";
 const NOTIFICATION_ID = "WATER_NOTIFICATION";
 const PAUSE_STORAGE_KEY = "waterReminderPauseUntil";
 
-chrome.runtime.onInstalled.addListener(async () => {
-  await rescheduleAll();
-});
+chrome.runtime.onInstalled.addListener(
+  async (details) => {
+    const startOnboarding =
+      shouldStartOnboarding(
+        details.reason
+      );
+
+    if (startOnboarding) {
+      await setOnboardingCompleted(
+        false
+      );
+    }
+
+    await rescheduleAll();
+
+    if (startOnboarding) {
+      await chrome.runtime.openOptionsPage();
+    }
+  }
+);
 
 chrome.runtime.onStartup.addListener(async () => {
   await rescheduleAll();
@@ -78,11 +102,6 @@ chrome.alarms.onAlarm.addListener(
 
       return;
     }
-
-    /*
-     * Clean up stale pause state if the browser was
-     * closed or suspended when the resume alarm fired.
-     */
     if (pauseUntil !== null) {
       await setPauseUntil(null);
     }
