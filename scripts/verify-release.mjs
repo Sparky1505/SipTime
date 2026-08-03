@@ -115,6 +115,11 @@ async function listFiles(
 const packageJson =
   await readJson("package.json");
 
+const packageLock =
+  await readJson(
+    "package-lock.json"
+  );
+
 const sourceManifest =
   await readJson("manifest.json");
 
@@ -136,6 +141,18 @@ if (
     `package.json contains an invalid release version: ${String(
       version
     )}`
+  );
+}
+
+if (
+  packageLock.version !==
+    version ||
+  packageLock.packages?.[""]
+    ?.version !==
+    version
+) {
+  fail(
+    `package-lock.json versions do not match package.json version ${version}.`
   );
 }
 

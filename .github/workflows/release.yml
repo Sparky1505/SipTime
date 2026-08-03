@@ -78,10 +78,13 @@ jobs:
         shell: bash
         run: |
           version="$(node -p "require('./package.json').version")"
+          release_notes="docs/releases/${GITHUB_REF_NAME}.md"
+
+          test -f "${release_notes}"
 
           gh release create "${GITHUB_REF_NAME}" \
             "releases/SipTime-v${version}-chrome.zip#Chrome Web Store package" \
             "releases/SHA256SUMS.txt#SHA-256 checksum" \
             --verify-tag \
-            --generate-notes \
+            --notes-file "${release_notes}" \
             --title "SipTime ${GITHUB_REF_NAME}"
