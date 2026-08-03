@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:extension": "tsc -b && vite build --config vite.extension.config.ts",
+    "release:verify": "node scripts/verify-release.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
