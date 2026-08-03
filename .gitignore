@@ -10,7 +10,7 @@ lerna-debug.log*
 
 
 dist-extension
-releases
+/releases/
 node_modules
 dist
 dist-ssr
