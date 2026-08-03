@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Test, lint, and build
+    name: Test, lint, build, and package
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -46,5 +46,22 @@ jobs:
       - name: Build website
         run: npm run build
 
-      - name: Build extension
-        run: npm run build:extension
+      - name: Build and package extension
+        shell: pwsh
+        run: ./scripts/package-extension.ps1
+
+      - name: Upload unpacked extension
+        uses: actions/upload-artifact@v7
+        with:
+          name: siptime-unpacked-${{ github.sha }}
+          path: dist-extension
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Chrome Web Store ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          path: releases/SipTime-v*-chrome.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
