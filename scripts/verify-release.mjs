@@ -194,6 +194,11 @@ if (
   );
 }
 
+await requirePath(
+  `docs/releases/v${version}.md`,
+  "file"
+);
+
 const requiredFiles = [
   "dist-extension/manifest.json",
   "dist-extension/popup.html",

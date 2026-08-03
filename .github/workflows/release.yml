@@ -80,7 +80,10 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           release_notes="docs/releases/${GITHUB_REF_NAME}.md"
 
-          test -f "${release_notes}"
+          if [[ ! -f "${release_notes}" ]]; then
+            echo "::error file=${release_notes}::Release notes are missing for ${GITHUB_REF_NAME}."
+            exit 1
+          fi
 
           gh release create "${GITHUB_REF_NAME}" \
             "releases/SipTime-v${version}-chrome.zip#Chrome Web Store package" \
